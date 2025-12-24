@@ -1,0 +1,213 @@
+# Libretro Cores for PlayStation Classic
+# One core name per line, comments start with #
+# Run: make CORE=<name> to build individual core
+
+# ============================================================================
+# TIER 1: Recommended (runs great on PSC)
+# ============================================================================
+
+# === NES/Famicom ===
+fceumm                  # FCE Ultra - accurate NES emulator with mappers
+nestopia                # Cycle-accurate NES emulator
+quicknes                # Fast, lightweight NES emulator
+mesen                   # High-accuracy NES emulator
+
+# === SNES ===
+snes9x                  # Full-featured SNES emulator
+snes9x2002              # Older Snes9x, very fast
+snes9x2005              # Snes9x optimized for low-end devices
+snes9x2005_plus         # Snes9x 2005 with enhancements
+snes9x2010              # Snes9x balanced speed/accuracy
+
+# === Sega Genesis/Mega Drive/SMS/GG/32X ===
+genesis_plus_gx         # Best for Genesis/CD/SMS/Game Gear
+# picodrive              # Disabled: requires host compiler for cyclone code generator
+gearsystem              # Master System / Game Gear
+
+# === PC Engine / TurboGrafx ===
+mednafen_pce_fast       # Fast PC Engine / TurboGrafx-16
+mednafen_supergrafx     # PC Engine SuperGrafx support
+
+# === Game Boy / GBC ===
+gambatte                # Accurate Game Boy / Color emulator
+gearboy                 # Game Boy / Color emulator
+tgbdual                 # Game Boy with link cable support
+sameboy                 # High-accuracy Game Boy / Color
+
+# === Game Boy Advance ===
+mgba                    # Accurate GBA emulator
+# gpsp                   # Disabled: detects host arch instead of target for dynarec
+vba_next                # Visual Boy Advance optimized
+meteor                  # Lightweight GBA emulator
+
+# === Atari 2600/7800 ===
+stella2014              # Atari 2600 emulator
+prosystem               # Atari 7800 emulator
+
+# === Neo Geo Pocket ===
+mednafen_ngp            # Neo Geo Pocket / Color
+
+# === WonderSwan ===
+mednafen_wswan          # Bandai WonderSwan / Color
+
+# === Virtual Boy ===
+mednafen_vb             # Nintendo Virtual Boy
+
+# === Lynx ===
+mednafen_lynx           # Atari Lynx emulator
+handy                   # Atari Lynx emulator
+
+# === Other Handhelds ===
+pokemini                # Pokemon Mini handheld
+
+# === Arcade (Recommended) ===
+fbneo                   # FinalBurn Neo - best overall arcade
+fbalpha2012_cps1        # CPS1 arcade (Street Fighter, etc)
+fbalpha2012_cps2        # CPS2 arcade (Marvel vs Capcom, etc)
+fbalpha2012_neogeo      # Neo Geo arcade/console
+mame2000                # MAME 0.37b5 - very fast, limited games
+mame2003_plus           # MAME 0.78 - best balance for PSC
+
+# ============================================================================
+# TIER 2: Good (works well, some games may need tuning)
+# ============================================================================
+
+# === PS1 ===
+pcsx_rearmed            # Best PS1 for PSC - native ARM dynarec
+mednafen_psx            # Accurate PS1, slightly heavier
+
+# === Arcade (Heavier) ===
+fbalpha2012             # Full FinalBurn Alpha 2012
+
+# === Neo Geo CD ===
+neocd                   # Neo Geo CD console
+
+# === Atari 800/5200 ===
+atari800                # Atari 400/800/5200 computers
+
+# === Computers - ZX Spectrum ===
+fuse                    # Sinclair ZX Spectrum
+81                      # Sinclair ZX81
+
+# === Computers - Amstrad ===
+cap32                   # Amstrad CPC 464/664/6128
+crocods                 # Amstrad CPC emulator
+
+# === Computers - Commodore ===
+vice_x64                # Commodore 64
+vice_x64sc              # Commodore 64 (cycle-accurate)
+vice_x128               # Commodore 128
+vice_xvic               # Commodore VIC-20
+
+# === Computers - Amiga ===
+puae                    # Commodore Amiga (P-UAE)
+
+# === Computers - DOS ===
+dosbox_svn              # MS-DOS / PC games
+
+# === Computers - MSX ===
+bluemsx                 # MSX / MSX2 / MSX2+ computers
+fmsx                    # MSX / MSX2 emulator
+
+# === Computers - Japanese ===
+nekop2                  # NEC PC-9801
+np2kai                  # NEC PC-9801 (enhanced)
+px68k                   # Sharp X68000
+quasi88                 # NEC PC-8801
+
+# === Computers - Other ===
+theodore                # Thomson MO/TO computers
+bk                      # Elektronika BK (Soviet micro)
+
+# === Vectrex/Odyssey ===
+vecx                    # GCE Vectrex (vector graphics)
+o2em                    # Magnavox Odyssey 2 / Philips Videopac
+
+# === Other Consoles ===
+freechaf                # Fairchild Channel F
+freeintv                # Mattel Intellivision
+uzem                    # Uzebox (retro-minimalist console)
+
+# === Game Engines ===
+prboom                  # Doom engine (PrBoom)
+tyrquake                # Quake 1 engine
+vitaquake2              # Quake 2 engine
+vitaquake3              # Quake 3 Arena engine
+ecwolf                  # Wolfenstein 3D engine
+nxengine                # Cave Story engine
+cannonball              # OutRun engine
+reminiscence            # Flashback engine
+xrick                   # Rick Dangerous engine
+boom3                   # Doom 3 engine (id Tech 4)
+# openlara               # Disabled: Tomb Raider - requires X11/GLX (PSC uses framebuffer/EGL)
+
+# === Fantasy Consoles ===
+lowresnx                # LowRes NX fantasy console
+tic80                   # TIC-80 fantasy computer
+lutro                   # Lua game framework (LÖVE-like)
+chailove                # ChaiScript 2D game framework
+
+# === ScummVM ===
+scummvm                 # LucasArts/Sierra adventure games
+
+# === Misc ===
+gw                      # Nintendo Game & Watch
+numero                  # TI-83 calculator
+craft                   # Minecraft-like voxel demo
+
+# ============================================================================
+# TIER 3: Experimental (may be too heavy, test thoroughly)
+# ============================================================================
+
+# === 3DO ===
+opera                   # 3DO Interactive Multiplayer
+
+# === PC Engine CD-ROM ===
+# mednafen_pcfx          # Disabled: PC-FX - detects host arch, uses x86 asm on ARM
+
+# === Atari Jaguar ===
+virtualjaguar           # Atari Jaguar (64-bit console)
+
+# === Atari ST ===
+hatari                  # Atari ST/STE/TT/Falcon
+
+# === EasyRPG ===
+# easyrpg                # Disabled: RPG Maker 2000/2003 - requires cmake and many deps
+
+# === Media/Utility ===
+gme                     # Game music player (NSF, SPC, etc)
+pocketcdg               # Karaoke CD+G player
+# ffmpeg                 # Disabled: video player - requires cross-compiled FFmpeg
+
+# === Fun/Casual ===
+2048                    # 2048 puzzle game
+mrboom                  # Bomberman clone (8-player)
+# dinothawr              # Disabled: puzzle game - ARM linker errors (missing NEON asm)
+
+# ============================================================================
+# TIER 4: Heavy (unlikely to run well, for testing only)
+# ============================================================================
+
+# === N64 ===
+# mupen64plus_next       # Disabled: Makefile adds x86 SSE flags during cross-compile
+# parallel_n64           # Disabled: Makefile adds x86 SSE flags during cross-compile
+
+# === Saturn ===
+# yabause                # Sega Saturn
+# kronos                 # Sega Saturn (newer) - needs OpenGL
+
+# === Dreamcast ===
+# flycast                # Sega Dreamcast
+# reicast                # Sega Dreamcast
+vemulator               # Dreamcast VMU only (lightweight)
+
+# === Nintendo DS ===
+# melonds                # Nintendo DS
+# desmume                # Nintendo DS
+
+# === PSP ===
+# ppsspp                 # PlayStation Portable
+
+# === PS1 Heavy ===
+# duckstation            # High-accuracy PS1
+# swanstation            # DuckStation fork
