@@ -14,6 +14,13 @@ export JOBS="${JOBS:-4}"
 
 cd /build/libretro-super
 
+# Fix broken Bitbucket submodule URLs for ecwolf (all three deps moved to github.com/ECWolfEngine)
+if [ "$CORE_NAME" = "ecwolf" ]; then
+    git config --global url."https://github.com/ECWolfEngine/sdl".insteadOf "https://bitbucket.org/ecwolf/sdl"
+    git config --global url."https://github.com/ECWolfEngine/sdl_mixer-for-ecwolf".insteadOf "https://bitbucket.org/ecwolf/sdl_mixer-for-ecwolf"
+    git config --global url."https://github.com/ECWolfEngine/sdl_net".insteadOf "https://bitbucket.org/ecwolf/sdl_net"
+fi
+
 echo "=== Fetching $CORE_NAME ==="
 ./libretro-fetch.sh "$CORE_NAME"
 
