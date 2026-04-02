@@ -11,7 +11,7 @@ ARG CROSSTOOL_NG_VERSION=1.28.0
 
 # libretro-super commit (update periodically for new cores/fixes)
 # Check latest: git ls-remote https://github.com/libretro/libretro-super.git HEAD
-ARG LIBRETRO_SUPER_REF=6244066badefb5ccca99e621ce0e653748bb8f37
+ARG LIBRETRO_SUPER_REF=60f5c62789af16379446544d64228afa1d6b28b7
 
 # Toolchain versions - matched for PlayStation Classic compatibility
 ARG CT_LINUX_VERSION=4_4
