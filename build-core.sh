@@ -31,28 +31,45 @@ export CFLAGS="$PSC_CFLAGS"
 export CXXFLAGS="$PSC_CFLAGS"
 export LDFLAGS="$PSC_LDFLAGS"
 
-./libretro-build.sh "$CORE_NAME" || true
+if [ "$CORE_NAME" = "scummvm" ]; then
+    # Build with LITE=1 to use lite_engines.list (classic adventure engines only).
+    # This cuts build time dramatically vs the full 2.8+ engine set.
+    SCUMMVM_DIR="/build/libretro-super/libretro-scummvm"
+    make -C "$SCUMMVM_DIR/backends/platform/libretro" \
+        platform=unix \
+        SCUMMVM_PATH="$SCUMMVM_DIR/" \
+        LITE=1 \
+        -j"$JOBS" || true
+    # Output lands in the libretro backend dir, not dist/unix
+    SO_FILE="$SCUMMVM_DIR/backends/platform/libretro/scummvm_libretro.so"
+    if [ -f "$SO_FILE" ]; then
+        cp "$SO_FILE" /build/output/
+    fi
+else
+    ./libretro-build.sh "$CORE_NAME" || true
 
-# Fix case-mismatched output filenames (e.g., FreeIntv_libretro.so -> freeintv_libretro.so)
-# Check both dist/unix and core build directories
-EXPECTED_FILE="dist/unix/${CORE_NAME}_libretro.so"
-if [ ! -f "$EXPECTED_FILE" ]; then
-    # Look for case-insensitive match in dist/unix first
-    ACTUAL_FILE=$(find dist/unix -maxdepth 1 -iname "${CORE_NAME}_libretro.so" 2>/dev/null | head -1)
+    # Fix case-mismatched output filenames (e.g., FreeIntv_libretro.so -> freeintv_libretro.so)
+    # Check both dist/unix and core build directories
+    EXPECTED_FILE="dist/unix/${CORE_NAME}_libretro.so"
+    if [ ! -f "$EXPECTED_FILE" ]; then
+        # Look for case-insensitive match in dist/unix first
+        ACTUAL_FILE=$(find dist/unix -maxdepth 1 -iname "${CORE_NAME}_libretro.so" 2>/dev/null | head -1)
 
-    # If not found, search in core build directories
-    if [ -z "$ACTUAL_FILE" ] || [ ! -f "$ACTUAL_FILE" ]; then
-        ACTUAL_FILE=$(find libretro-* -name "*_libretro.so" -iname "${CORE_NAME}_libretro.so" 2>/dev/null | head -1)
+        # If not found, search in core build directories
+        if [ -z "$ACTUAL_FILE" ] || [ ! -f "$ACTUAL_FILE" ]; then
+            ACTUAL_FILE=$(find libretro-* -name "*_libretro.so" -iname "${CORE_NAME}_libretro.so" 2>/dev/null | head -1)
+        fi
+
+        if [ -n "$ACTUAL_FILE" ] && [ -f "$ACTUAL_FILE" ]; then
+            echo "=== Fixing filename case: $(basename "$ACTUAL_FILE") -> ${CORE_NAME}_libretro.so ==="
+            cp "$ACTUAL_FILE" "$EXPECTED_FILE"
+        fi
     fi
 
-    if [ -n "$ACTUAL_FILE" ] && [ -f "$ACTUAL_FILE" ]; then
-        echo "=== Fixing filename case: $(basename "$ACTUAL_FILE") -> ${CORE_NAME}_libretro.so ==="
-        cp "$ACTUAL_FILE" "$EXPECTED_FILE"
-    fi
+    find dist/unix -name "*.so" -exec cp {} /build/output/ \;
 fi
 
 echo "=== Copying output ==="
-find dist/unix -name "*.so" -exec cp {} /build/output/ \;
 
 echo "=== Stripping binaries ==="
 for so in /build/output/*.so; do
