@@ -79,7 +79,8 @@ package:
 	@. $(OUTPUT_DIR)/VERSION && \
 	RELEASE_NAME="libretro-cores-psc-$${libretro_super_date}-$${libretro_super_commit}" && \
 	echo "Creating release: $${RELEASE_NAME}.tar.gz" && \
-	tar -czvf $(RELEASE_DIR)/$${RELEASE_NAME}.tar.gz -C $(OUTPUT_DIR) . && \
+	tar -czvf $(RELEASE_DIR)/$${RELEASE_NAME}.tar.gz -C $(OUTPUT_DIR) \
+		--exclude='./success.txt' --exclude='./failed.txt' --exclude='./skipped.txt' . && \
 	echo "Created: $(RELEASE_DIR)/$${RELEASE_NAME}.tar.gz"
 
 # Full release: build + package
