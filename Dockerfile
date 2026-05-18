@@ -232,7 +232,7 @@ RUN mkdir -p /build/output /build/metadata
 
 # Copy build scripts
 COPY scripts/ /build/scripts/
-RUN chmod +x /build/scripts/build-core.sh /build/scripts/audit-cores.sh && \
+RUN chmod +x /build/scripts/build-core.sh /build/scripts/audit-cores.sh /build/scripts/sync-core-info.sh && \
     ln -sf /build/scripts/build-core.sh /build/build-core.sh
 
 # Default: interactive shell

@@ -14,6 +14,7 @@ make                     # Build all cores (parallel)
 make CORE=snes9x         # Build single core
 make PARALLEL=16         # Adjust parallelism
 make status              # Show build progress
+make core-info           # Generate dist/info metadata for enabled cores
 make audit-cores         # Compare cores.txt with pinned libretro-super rules
 make retry-failed        # Retry unresolved failures from the last full build
 make release             # Create release archive
@@ -26,7 +27,8 @@ Outputs:
 - `build_metadata/VERSION` - build/toolchain version info
 - `build_metadata/commits/*.so.commit` - per-core commit sidecars used to build the manifest
 - `build_status/{success,failed,skipped}.txt` - latest build run status
-- `cores_output/*.so` - built libretro cores
+- `dist/cores/*.so` - built libretro cores
+- `dist/info/*.info` - libretro core metadata copied from the pinned `libretro-super` checkout
 
 ## Cores
 

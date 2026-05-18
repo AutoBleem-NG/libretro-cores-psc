@@ -10,7 +10,8 @@
 #   make shell              - Interactive container
 
 IMAGE_NAME := libretro-cores-psc
-OUTPUT_DIR := cores_output
+OUTPUT_DIR := dist/cores
+INFO_DIR := dist/info
 METADATA_DIR := build_metadata
 COMMIT_DIR := $(METADATA_DIR)/commits
 STATUS_DIR := build_status
@@ -29,7 +30,7 @@ PARALLEL ?= $(shell n=$$(nproc); p=$$(( (n + 1) / 2 )); [ $$p -lt 1 ] && p=1; ec
 # Jobs per core build (uses remaining CPUs)
 JOBS_PER_CORE ?= $(shell n=$$(nproc); j=$$(( n / $(PARALLEL) )); [ $$j -lt 1 ] && j=1; echo $$j)
 
-.PHONY: all image version version-info package release parallel-build commits build-all build-single debug shell list audit-cores clean distclean info status retry-failed check-version help
+.PHONY: all image version version-info core-info package release parallel-build commits build-all build-single debug shell list audit-cores clean distclean info status retry-failed check-version help
 
 # Default: build all cores from cores.txt
 all: image
@@ -70,9 +71,18 @@ version-info: image
 		echo "target=armv8-a-cortex-a35-neon"' > $(METADATA_DIR)/VERSION
 	@cat $(METADATA_DIR)/VERSION
 
+# Write libretro core info files for the enabled core set.
+core-info: image
+	@mkdir -p $(INFO_DIR)
+	@docker run --rm \
+		-v $(PWD)/cores.txt:/build/cores.txt:ro \
+		-v $(PWD)/dist:/build/dist \
+		$(IMAGE_NAME) \
+		/build/scripts/sync-core-info.sh /build/cores.txt /build/libretro-super /build/dist/info
+
 # Package cores for release
 # Filename format: libretro-cores-psc-{date}-{commit}.tar.gz
-package:
+package: core-info
 	@if [ ! -d $(OUTPUT_DIR) ] || [ -z "$$(ls -A $(OUTPUT_DIR)/*.so 2>/dev/null)" ]; then \
 		echo "Error: No cores built. Run 'make' first."; \
 		exit 1; \
@@ -97,14 +107,16 @@ package:
 		exit 1; \
 	fi
 	@. $(METADATA_DIR)/VERSION && \
-		RELEASE_NAME="libretro-cores-psc-$${libretro_super_date}-$${libretro_super_commit}" && \
-		echo "Creating release: $${RELEASE_NAME}.tar.gz" && \
-		tmp=$$(mktemp -d) && \
-		trap "rm -rf $$tmp" EXIT && \
-		sed 's/#.*//' cores.txt | tr -d ' \t' | grep -v '^$$' | while read -r core; do \
-			cp "$(OUTPUT_DIR)/$${core}_libretro.so" "$$tmp/"; \
-		done && \
-		cp $(METADATA_DIR)/VERSION $(METADATA_DIR)/COMMITS.txt "$$tmp/" && \
+			RELEASE_NAME="libretro-cores-psc-$${libretro_super_date}-$${libretro_super_commit}" && \
+			echo "Creating release: $${RELEASE_NAME}.tar.gz" && \
+			tmp=$$(mktemp -d) && \
+			trap "rm -rf $$tmp" EXIT && \
+			mkdir -p "$$tmp/dist/cores" "$$tmp/dist/info" && \
+			sed 's/#.*//' cores.txt | tr -d ' \t' | grep -v '^$$' | while read -r core; do \
+				cp "$(OUTPUT_DIR)/$${core}_libretro.so" "$$tmp/dist/cores/"; \
+			done && \
+			cp $(INFO_DIR)/*.info "$$tmp/dist/info/" && \
+			cp $(METADATA_DIR)/VERSION $(METADATA_DIR)/COMMITS.txt "$$tmp/" && \
 		tar -czvf $(RELEASE_DIR)/$${RELEASE_NAME}.tar.gz -C "$$tmp" . && \
 		echo "Created: $(RELEASE_DIR)/$${RELEASE_NAME}.tar.gz"
 
@@ -255,7 +267,7 @@ audit-cores: image
 
 # Clean output
 clean:
-	rm -rf $(OUTPUT_DIR) $(METADATA_DIR) $(STATUS_DIR) $(RELEASE_DIR) logs
+	rm -rf dist $(METADATA_DIR) $(STATUS_DIR) $(RELEASE_DIR) logs
 
 # Deep clean (remove image too)
 distclean: clean
@@ -289,6 +301,7 @@ status:
 	@echo "With commit info: $$(ls -1 $(COMMIT_DIR)/*.so.commit 2>/dev/null | wc -l) cores"
 	@if [ -f $(METADATA_DIR)/VERSION ]; then echo "Version file: $(METADATA_DIR)/VERSION"; fi
 	@if [ -f $(METADATA_DIR)/COMMITS.txt ]; then echo "Commit manifest: $(METADATA_DIR)/COMMITS.txt"; fi
+	@if [ -d $(INFO_DIR) ]; then echo "Core info files: $(INFO_DIR) ($$(ls -1 $(INFO_DIR)/*.info 2>/dev/null | wc -l))"; fi
 	@if [ -d $(STATUS_DIR) ]; then echo "Status files: $(STATUS_DIR)/"; else echo "Status files: none yet (run make or make build-all)"; fi
 	@if [ -f $(FAILED_FILE) ]; then \
 		unresolved=$$(sed 's/#.*//' cores.txt | tr -d ' \t' | grep -v '^$$' | while read -r core; do \
@@ -372,6 +385,7 @@ help:
 	@echo "  make audit-cores         Compare cores.txt with supported libretro-super rules"
 	@echo "  make status              Show build status"
 	@echo "  make retry-failed        Rebuild failed cores"
+	@echo "  make core-info           Write dist/info files for enabled cores"
 	@echo "  make debug CORE=<name>   Debug build with full log"
 	@echo "  make clean               Remove built cores and releases"
 	@echo "  make distclean           Remove cores, releases, and Docker image"
