@@ -1,0 +1,6 @@
+.git/
+build_metadata/
+build_status/
+cores_output/
+logs/
+releases/

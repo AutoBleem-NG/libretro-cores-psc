@@ -14,22 +14,29 @@ make                     # Build all cores (parallel)
 make CORE=snes9x         # Build single core
 make PARALLEL=16         # Adjust parallelism
 make status              # Show build progress
+make audit-cores         # Compare cores.txt with pinned libretro-super rules
+make retry-failed        # Retry unresolved failures from the last full build
 make release             # Create release archive
 make help                # Show all commands
 ```
 
-Output: `cores_output/*.so`
+Outputs:
+
+- `build_metadata/COMMITS.txt` - source commit manifest for built cores
+- `build_metadata/VERSION` - build/toolchain version info
+- `build_metadata/commits/*.so.commit` - per-core commit sidecars used to build the manifest
+- `build_status/{success,failed,skipped}.txt` - latest build run status
+- `cores_output/*.so` - built libretro cores
 
 ## Cores
 
-Edit `cores.txt` to configure builds. Organized by PSC performance:
+Edit `cores.txt` to configure builds. Cores are grouped by system, with disabled
+entries left in place when the pinned `libretro-super` checkout lacks a build
+rule or the current PSC toolchain is missing required dependencies.
 
-| Tier | Systems |
-|------|---------|
-| **1 - Full speed** | NES, SNES, Genesis, PC Engine, GB/GBA, Neo Geo, CPS1/2 |
-| **2 - Great** | PS1, Arcade, Amiga, DOS, C64, MSX |
-| **3 - Experimental** | 3DO, Jaguar, Atari ST |
-| **4 - Heavy** | N64, Saturn, Dreamcast, PSP |
+Per-core PSC build fixes live in `scripts/core-fixes/`. The main container entry
+point is `scripts/build-core.sh`; a root `/build/build-core.sh` symlink is kept
+inside the Docker image for compatibility.
 
 ## Build
 

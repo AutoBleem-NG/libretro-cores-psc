@@ -11,7 +11,7 @@ ARG CROSSTOOL_NG_VERSION=1.28.0
 
 # libretro-super commit (update periodically for new cores/fixes)
 # Check latest: git ls-remote https://github.com/libretro/libretro-super.git HEAD
-ARG LIBRETRO_SUPER_REF=60f5c62789af16379446544d64228afa1d6b28b7
+ARG LIBRETRO_SUPER_REF=b344383eb04aae786d8a9565fe2a61d940a574c0
 
 # Toolchain versions - matched for PlayStation Classic compatibility
 ARG CT_LINUX_VERSION=4_4
@@ -100,8 +100,11 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y \
     git \
     make \
-    cmake \
+    ninja-build \
     autoconf \
+    libtool-bin \
+    gettext \
+    bc \
     pkg-config \
     pkg-config-arm-linux-gnueabihf \
     wget \
@@ -112,6 +115,13 @@ RUN apt-get update && apt-get install -y \
     mesa-common-dev \
     libgl1-mesa-dev \
     && rm -rf /var/lib/apt/lists/*
+
+# Install a newer CMake than Ubuntu 18.04's 3.10.2 - required by dirksimple
+# (>=3.12) and other modern CMAKE recipes. Use the official Kitware binary.
+RUN wget -q https://github.com/Kitware/CMake/releases/download/v3.26.6/cmake-3.26.6-linux-x86_64.tar.gz -O /tmp/cmake.tgz && \
+    tar -xzf /tmp/cmake.tgz --strip-components=1 -C /usr/local && \
+    rm /tmp/cmake.tgz && \
+    cmake --version
 
 # ==============================================================================
 # Install ARM Libraries
@@ -127,7 +137,6 @@ RUN dpkg --add-architecture armhf && \
     libudev-dev:armhf \
     libusb-1.0-0-dev:armhf \
     libsdl2-dev:armhf \
-    libsdl2-dev \
     libgles2-mesa-dev:armhf \
     libegl1-mesa-dev:armhf \
     libdrm-dev:armhf \
@@ -140,7 +149,7 @@ RUN dpkg --add-architecture armhf && \
     zlib1g-dev:armhf \
     libpng-dev:armhf \
     libgl1-mesa-dev:armhf \
-    && apt-get remove -y libpulse-dev:armhf || true \
+    && (apt-get remove -y libpulse-dev:armhf || true) \
     && rm -rf /var/lib/apt/lists/*
 
 # ==============================================================================
@@ -219,11 +228,12 @@ ENV platform="linux-armv7-neon-hardfloat"
 ENV JOBS="4"
 
 # Create output directory
-RUN mkdir -p /build/output
+RUN mkdir -p /build/output /build/metadata
 
 # Copy build scripts
-COPY build-core.sh /build/
-RUN chmod +x /build/build-core.sh
+COPY scripts/ /build/scripts/
+RUN chmod +x /build/scripts/build-core.sh /build/scripts/audit-cores.sh && \
+    ln -sf /build/scripts/build-core.sh /build/build-core.sh
 
 # Default: interactive shell
 CMD ["/bin/bash"]

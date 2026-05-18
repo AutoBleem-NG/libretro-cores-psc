@@ -1,6 +1,8 @@
 # Build outputs
-cores_output/
 *.so
+build_metadata/
+build_status/
+cores_output/
 logs/
 releases/
 
