@@ -12,9 +12,58 @@ fi
 SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
 SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
 CORE_FIXES_DIR="${CORE_FIXES_DIR:-$SCRIPT_DIR/core-fixes}"
+CORE_REFS_FILE="${CORE_REFS_FILE:-$SCRIPT_DIR/core-refs.txt}"
 
 # Use JOBS from environment or default to 4.
 export JOBS="${JOBS:-4}"
+CORE_REF_POLICY="branch"
+CORE_REF_VALUE=""
+CORE_REF_FALLBACK="fail"
+CORE_TAG_REF_USED=""
+CORE_TAG_SOURCE="branch"
+
+load_core_ref_config() {
+    local line
+    local core
+    local policy
+    local ref
+    local fallback
+
+    [ -f "$CORE_REFS_FILE" ] || return 0
+
+    while IFS= read -r line || [ -n "$line" ]; do
+        line="${line%%#*}"
+        read -r core policy ref fallback _ <<< "$line"
+        [ -n "${core:-}" ] && [ -n "${policy:-}" ] || continue
+        ref="${ref:--}"
+        fallback="${fallback:-branch}"
+
+        if [ "$core" = "*" ] || [ "$core" = "$CORE_NAME" ]; then
+            CORE_REF_POLICY="$policy"
+            CORE_REF_VALUE="$ref"
+            [ "$CORE_REF_VALUE" = "-" ] && CORE_REF_VALUE=""
+            CORE_REF_FALLBACK="$fallback"
+        fi
+    done < "$CORE_REFS_FILE"
+
+    # Backward-compatible escape hatches for existing command lines.
+    if [ -n "${CORE_TAG_POLICY:-}" ]; then
+        case "$CORE_TAG_POLICY" in
+            latest) CORE_REF_POLICY="latest-tag" ;;
+            branch) CORE_REF_POLICY="branch" ;;
+            *) CORE_REF_POLICY="$CORE_TAG_POLICY" ;;
+        esac
+    fi
+    if [ -n "${CORE_TAG_FALLBACK:-}" ]; then
+        if [ "$CORE_TAG_FALLBACK" = "1" ]; then
+            CORE_REF_FALLBACK="branch"
+        else
+            CORE_REF_FALLBACK="fail"
+        fi
+    fi
+}
+
+load_core_ref_config
 
 cd /build/libretro-super
 
@@ -28,8 +77,91 @@ mkdir -p "$METADATA_OUT"
 mkdir -p "$(dirname "$COMMIT_OUT")"
 rm -f "$SO_OUT" "$COMMIT_OUT" "${SO_OUT}.commit"
 
+core_source_dir() {
+    RESOLVED_DIR=$(
+        cd /build/libretro-super 2>/dev/null || exit
+        # shellcheck disable=SC1091
+        . rules.d/core-rules.sh 2>/dev/null
+        eval "echo \${libretro_${CORE_NAME}_dir:-libretro-${CORE_NAME}}"
+    )
+    echo "/build/libretro-super/$RESOLVED_DIR"
+}
+
+latest_version_tag_for_url() {
+    git ls-remote --tags --refs "$1" 'refs/tags/*' \
+        | awk -F/ '{print $NF}' \
+        | grep -E '[0-9]' \
+        | sort -V \
+        | tail -1 || true
+}
+
+latest_version_tag() {
+    latest_version_tag_for_url origin
+}
+
+core_ref_override() {
+    local env_prefix
+    local env_name
+
+    if [ -n "${CORE_REF:-}" ]; then
+        printf '%s' "$CORE_REF"
+        return 0
+    fi
+
+    env_prefix=$(printf '%s' "$CORE_NAME" | tr '[:lower:]-' '[:upper:]_')
+    env_name="${env_prefix}_REF"
+    if printf '%s' "$env_name" | grep -Eq '^[A-Z_][A-Z0-9_]*$'; then
+        printf '%s' "${!env_name:-}"
+    fi
+}
+
+checkout_core_ref() {
+    local src_dir
+    local ref
+
+    CORE_TAG_REF_USED=""
+    CORE_TAG_SOURCE="branch"
+    [ "$CORE_REF_POLICY" != "branch" ] || return 0
+
+    src_dir="$(core_source_dir)"
+    [ -d "$src_dir/.git" ] || return 0
+
+    ref="$(core_ref_override)"
+    if [ -n "$ref" ]; then
+        echo "=== Using ${CORE_NAME} ref override: $ref ==="
+        CORE_TAG_SOURCE="override"
+    elif [ "$CORE_REF_POLICY" = "pinned" ]; then
+        ref="$CORE_REF_VALUE"
+        if [ -z "$ref" ]; then
+            echo "Error: $CORE_NAME has pinned policy but no ref in $CORE_REFS_FILE" >&2
+            exit 1
+        fi
+        echo "=== Using pinned ${CORE_NAME} ref: $ref ==="
+        CORE_TAG_SOURCE="pinned"
+    elif [ "$CORE_REF_POLICY" = "latest-tag" ]; then
+        ref="$(cd "$src_dir" && latest_version_tag)"
+        if [ -z "$ref" ]; then
+            echo "=== No version tag found for $CORE_NAME; keeping fetched branch ==="
+            return 0
+        fi
+        echo "=== Using latest ${CORE_NAME} tag: $ref ==="
+        CORE_TAG_SOURCE="latest-tag"
+    else
+        echo "Error: unsupported policy for $CORE_NAME in $CORE_REFS_FILE: $CORE_REF_POLICY" >&2
+        exit 1
+    fi
+
+    cd "$src_dir"
+    git fetch --depth=1 origin "refs/tags/$ref:refs/tags/$ref" 2>/dev/null || true
+    git checkout -q "$ref"
+    git submodule update --init --recursive 2>/dev/null || true
+    CORE_TAG_REF_USED="$ref"
+    cd /build/libretro-super
+}
+
 fetch_core() {
     ./libretro-fetch.sh "$CORE_NAME"
+    checkout_core_ref
 
     # Initialize submodules recursively (fixes tic80, scummvm, etc.).
     CORE_DIR=$(find libretro-* -maxdepth 0 -type d -name "*${CORE_NAME}*" 2>/dev/null | head -1)
@@ -72,16 +204,6 @@ build_core() {
     fi
 }
 
-core_source_dir() {
-    RESOLVED_DIR=$(
-        cd /build/libretro-super 2>/dev/null || exit
-        # shellcheck disable=SC1091
-        . rules.d/core-rules.sh 2>/dev/null
-        eval "echo \${libretro_${CORE_NAME}_dir:-libretro-${CORE_NAME}}"
-    )
-    echo "/build/libretro-super/$RESOLVED_DIR"
-}
-
 if [ -f "$CORE_FIXES_DIR/$CORE_NAME.sh" ]; then
     # shellcheck disable=SC1090
     . "$CORE_FIXES_DIR/$CORE_NAME.sh"
@@ -107,6 +229,20 @@ configure_core_flags
 
 build_core
 
+if [ ! -f "$SO_OUT" ] && [ -n "${CORE_TAG_REF_USED:-}" ] && [ "$CORE_REF_FALLBACK" = "branch" ]; then
+    echo "=== Tagged build did not produce ${CORE_NAME}_libretro.so; retrying fetched branch ==="
+    rm -rf "$(core_source_dir)"
+    rm -f "$SO_OUT"
+    CORE_REF_POLICY=branch
+    CORE_TAG_REF_USED=""
+    CORE_TAG_SOURCE="branch-fallback"
+    fetch_core
+    CORE_TAG_SOURCE="branch-fallback"
+    patch_core
+    configure_core_flags
+    build_core
+fi
+
 echo "=== Copying output ==="
 
 if [ ! -f "$SO_OUT" ]; then
@@ -127,6 +263,8 @@ if [ -d "$SRC_DIR/.git" ]; then
             echo "core=$CORE_NAME"
             echo "commit=$COMMIT"
             echo "url=$URL"
+            echo "ref=${CORE_TAG_REF_USED:-branch}"
+            echo "ref_source=$CORE_TAG_SOURCE"
             echo "build_date=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
         } > "$COMMIT_OUT"
     else

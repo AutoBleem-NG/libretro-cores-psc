@@ -1,7 +1,18 @@
 fetch_core() {
-    # PPSSPP v1.13.1b is known to run on the PlayStation Classic. Keep this
-    # overridable while we qualify newer releases on real hardware.
-    PPSSPP_VERSION="${PPSSPP_VERSION:-v1.20.4}"
+    PPSSPP_VERSION="${PPSSPP_VERSION:-$(core_ref_override)}"
+    if [ -n "$PPSSPP_VERSION" ]; then
+        CORE_TAG_SOURCE="override"
+    elif [ "$CORE_REF_POLICY" = "pinned" ]; then
+        PPSSPP_VERSION="$CORE_REF_VALUE"
+        CORE_TAG_SOURCE="pinned"
+    elif [ "$CORE_REF_POLICY" = "latest-tag" ]; then
+        PPSSPP_VERSION="$(latest_version_tag_for_url https://github.com/hrydgard/ppsspp.git)"
+        CORE_TAG_SOURCE="latest-tag"
+    else
+        echo "Error: unsupported PPSSPP policy in $CORE_REFS_FILE: $CORE_REF_POLICY" >&2
+        exit 1
+    fi
+    CORE_TAG_REF_USED="$PPSSPP_VERSION"
     PPSSPP_DIR="/build/libretro-super/libretro-ppsspp"
     rm -rf "$PPSSPP_DIR"
     git clone --depth=1 --branch "$PPSSPP_VERSION" --recurse-submodules --shallow-submodules \

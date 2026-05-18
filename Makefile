@@ -164,6 +164,9 @@ parallel-build: image version-info
 commits:
 	@mkdir -p $(METADATA_DIR) $(COMMIT_DIR)
 	@if [ -d $(OUTPUT_DIR)/.metadata/commits ]; then find $(OUTPUT_DIR)/.metadata/commits -maxdepth 1 -type f -name '*.so.commit' -exec mv -f {} $(COMMIT_DIR)/ \;; fi
+	@if [ -d $(OUTPUT_DIR) ]; then find $(OUTPUT_DIR) -maxdepth 1 -type f -name '*.so.commit' -exec mv -f {} $(COMMIT_DIR)/ \;; fi
+	@if [ -d $(OUTPUT_DIR)/.metadata ]; then find $(OUTPUT_DIR)/.metadata -maxdepth 1 -type f -name '*.so.commit' -exec mv -f {} $(COMMIT_DIR)/ \;; fi
+	@rm -f $(OUTPUT_DIR)/COMMITS.txt
 	@if ls $(COMMIT_DIR)/*.so.commit >/dev/null 2>&1; then \
 		echo "" ; \
 		echo "=== Aggregating commit info ==="; \
