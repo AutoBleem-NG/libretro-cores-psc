@@ -18,6 +18,7 @@ STATUS_DIR := build_status
 FAILED_FILE := $(STATUS_DIR)/failed.txt
 SUCCESS_FILE := $(STATUS_DIR)/success.txt
 SKIPPED_FILE := $(STATUS_DIR)/skipped.txt
+LOG_DIR := $(STATUS_DIR)/logs
 RELEASE_DIR := releases
 CORE ?=
 
@@ -29,8 +30,9 @@ PARALLEL ?= $(shell n=$$(nproc); p=$$(( (n + 1) / 2 )); [ $$p -lt 1 ] && p=1; ec
 
 # Jobs per core build (uses remaining CPUs)
 JOBS_PER_CORE ?= $(shell n=$$(nproc); j=$$(( n / $(PARALLEL) )); [ $$j -lt 1 ] && j=1; echo $$j)
+RELEASE_PREFIX := libretro-cores-psc
 
-.PHONY: all image version version-info core-info package release parallel-build commits build-all build-single debug shell list audit-cores clean distclean info status retry-failed check-version help
+.PHONY: all docker-check image version version-info core-info package release parallel-build commits build-all build-single debug shell list audit-cores clean distclean info status retry-failed check-version help
 
 # Default: build all cores from cores.txt
 all: image
@@ -40,8 +42,24 @@ all: image
 		$(MAKE) parallel-build; \
 	fi
 
+# Check Docker availability before attempting builds.
+docker-check:
+	@command -v docker >/dev/null 2>&1 || { \
+		echo "Error: docker is not installed or not in PATH."; \
+		exit 1; \
+	}
+	@docker info >/dev/null 2>&1 || { \
+		echo "Error: cannot access the Docker daemon."; \
+		echo "Ensure the daemon is running and this user can access /var/run/docker.sock."; \
+		echo "Current socket permissions:"; \
+		ls -l /var/run/docker.sock 2>/dev/null || echo "  /var/run/docker.sock not found"; \
+		echo "Current user and groups:"; \
+		id; \
+		exit 1; \
+	}
+
 # Build Docker image (includes toolchain build, cached after first run)
-image:
+image: docker-check
 	@echo "Building Docker image (includes crosstool-ng toolchain)..."
 	@echo "First build compiles toolchain from scratch, subsequent builds use cache."
 	docker build -t $(IMAGE_NAME) \
@@ -63,12 +81,13 @@ version-info: image
 	@mkdir -p $(METADATA_DIR)
 	@echo "Fetching libretro-super version info..."
 	@docker run --rm $(IMAGE_NAME) sh -c '\
-		cd /build/libretro-super && \
-		echo "libretro_super_commit=$$(git rev-parse --short HEAD)" && \
-		echo "libretro_super_date=$$(git log -1 --format=%cd --date=short)" && \
-		echo "build_date=$$(date -u +%Y-%m-%d)" && \
-		echo "toolchain=crosstool-ng-gcc9-glibc2.23" && \
-		echo "target=armv8-a-cortex-a35-neon"' > $(METADATA_DIR)/VERSION
+			cd /build/libretro-super && \
+			echo "libretro_super_commit_full=$$(git rev-parse HEAD)" && \
+			echo "libretro_super_commit=$$(git rev-parse --short HEAD)" && \
+			echo "libretro_super_date=$$(git log -1 --format=%cd --date=short)" && \
+			echo "build_date=$$(date -u +%Y-%m-%d)" && \
+			echo "toolchain=crosstool-ng-gcc9-glibc2.23" && \
+			echo "target=armv8-a-cortex-a35-neon"' > $(METADATA_DIR)/VERSION
 	@cat $(METADATA_DIR)/VERSION
 
 # Write libretro core info files for the enabled core set.
@@ -82,7 +101,7 @@ core-info: image
 
 # Package cores for release
 # Filename format: libretro-cores-psc-{date}-{commit}.tar.gz
-package: core-info
+package: version-info core-info
 	@if [ ! -d $(OUTPUT_DIR) ] || [ -z "$$(ls -A $(OUTPUT_DIR)/*.so 2>/dev/null)" ]; then \
 		echo "Error: No cores built. Run 'make' first."; \
 		exit 1; \
@@ -106,8 +125,21 @@ package: core-info
 		echo "Run 'make' or 'make retry-failed' before packaging."; \
 		exit 1; \
 	fi
+	@current_libretro_super_commit=$$(. $(METADATA_DIR)/VERSION && printf '%s' "$$libretro_super_commit_full"); \
+	stale=$$(sed 's/#.*//' cores.txt | tr -d ' \t' | grep -v '^$$' | while read -r core; do \
+		commit_file="$(COMMIT_DIR)/$${core}_libretro.so.commit"; \
+		if [ ! -f "$$commit_file" ] || ! grep -Fxq "libretro_super_commit=$$current_libretro_super_commit" "$$commit_file"; then \
+			echo "$$core"; \
+		fi; \
+	done); \
+	if [ -n "$$stale" ]; then \
+		echo "Error: built cores do not match current libretro-super commit $$current_libretro_super_commit:"; \
+		echo "$$stale" | sed 's/^/  /'; \
+		echo "Run 'make release' or 'make FORCE=1 release' to rebuild for the new pin."; \
+		exit 1; \
+	fi
 	@. $(METADATA_DIR)/VERSION && \
-			RELEASE_NAME="libretro-cores-psc-$${libretro_super_date}-$${libretro_super_commit}" && \
+			RELEASE_NAME="$(RELEASE_PREFIX)-$${libretro_super_date}-$${libretro_super_commit}" && \
 			echo "Creating release: $${RELEASE_NAME}.tar.gz" && \
 			tmp=$$(mktemp -d) && \
 			trap "rm -rf $$tmp" EXIT && \
@@ -117,8 +149,16 @@ package: core-info
 			done && \
 			cp $(INFO_DIR)/*.info "$$tmp/dist/info/" && \
 			cp $(METADATA_DIR)/VERSION $(METADATA_DIR)/COMMITS.txt "$$tmp/" && \
-		tar -czvf $(RELEASE_DIR)/$${RELEASE_NAME}.tar.gz -C "$$tmp" . && \
-		echo "Created: $(RELEASE_DIR)/$${RELEASE_NAME}.tar.gz"
+			bash ./scripts/generate-release-notes.sh \
+				"$${RELEASE_NAME}" \
+				"$$tmp" \
+				"$$tmp/VERSION" \
+				"$$tmp/COMMITS.txt" \
+				"$$tmp/release-notes.md" && \
+			cp "$$tmp/release-notes.md" $(RELEASE_DIR)/$${RELEASE_NAME}.md && \
+			tar -czvf $(RELEASE_DIR)/$${RELEASE_NAME}.tar.gz -C "$$tmp" . && \
+			echo "Created: $(RELEASE_DIR)/$${RELEASE_NAME}.tar.gz" && \
+			echo "Created: $(RELEASE_DIR)/$${RELEASE_NAME}.md"
 
 # Full release: build + package
 release: all package
@@ -126,32 +166,39 @@ release: all package
 # Build all cores in parallel using GNU parallel or xargs
 # Use FORCE=1 to rebuild all cores (ignores existing .so files)
 parallel-build: image version-info
-	@mkdir -p $(OUTPUT_DIR) $(METADATA_DIR) $(STATUS_DIR)
+	@mkdir -p $(OUTPUT_DIR) $(METADATA_DIR) $(STATUS_DIR) $(LOG_DIR)
 	@if [ ! -f cores.txt ]; then \
 		echo "Error: cores.txt not found"; \
 		exit 1; \
 	fi
 	@rm -f $(FAILED_FILE) $(SUCCESS_FILE) $(SKIPPED_FILE)
+	@rm -f $(LOG_DIR)/*.log 2>/dev/null || true
 	@echo "=== Building cores ($(PARALLEL) parallel, $(JOBS_PER_CORE) jobs each) ==="
-	@sed 's/#.*//' cores.txt | tr -d ' \t' | grep -v '^$$' | \
+	@current_libretro_super_commit=$$(. $(METADATA_DIR)/VERSION && printf '%s' "$$libretro_super_commit_full"); \
+	export CURRENT_LIBRETRO_SUPER_COMMIT="$$current_libretro_super_commit"; \
+	sed 's/#.*//' cores.txt | tr -d ' \t' | grep -v '^$$' | \
 		xargs -P $(PARALLEL) -I {} sh -c ' \
-			if [ -z "$(FORCE)" ] && [ -f "$(OUTPUT_DIR)/{}_libretro.so" ]; then \
+			commit_file="$(COMMIT_DIR)/{}_libretro.so.commit"; \
+			if [ -z "$(FORCE)" ] && [ -f "$(OUTPUT_DIR)/{}_libretro.so" ] && [ -f "$$commit_file" ] && grep -Fxq "libretro_super_commit=$$CURRENT_LIBRETRO_SUPER_COMMIT" "$$commit_file"; then \
 				echo "--- Skipping: {} (already built)"; \
 				echo "{}" >> $(SKIPPED_FILE); \
 			else \
 				echo ">>> Building: {}"; \
 				rm -f "$(OUTPUT_DIR)/{}_libretro.so"; \
+				log_file="$(LOG_DIR)/{}.log"; \
 				docker run --rm \
 					-e JOBS=$(JOBS_PER_CORE) \
 					-v $(PWD)/$(OUTPUT_DIR):/build/output \
 					-v $(PWD)/$(METADATA_DIR):/build/metadata \
 					$(IMAGE_NAME) \
-					/build/build-core.sh "{}" 2>&1 | tail -5; \
+					/build/build-core.sh "{}" > "$$log_file" 2>&1; \
 				if [ -f "$(OUTPUT_DIR)/{}_libretro.so" ]; then \
 					echo "<<< Done: {}"; \
 					echo "{}" >> $(SUCCESS_FILE); \
 				else \
 					echo "<<< FAILED: {}"; \
+					echo "    log: $$log_file"; \
+					tail -20 "$$log_file" 2>/dev/null || true; \
 					echo "{}" >> $(FAILED_FILE); \
 				fi \
 			fi \
@@ -396,7 +443,7 @@ help:
 	@echo "  make version             Show version info"
 	@echo "  make version-info        Write VERSION file to metadata"
 	@echo "  make commits             Aggregate per-core commits into COMMITS.txt"
-	@echo "  make package             Package built cores into release archive"
+	@echo "  make package             Package cores and create release notes (.tar.gz + .md)"
 	@echo "  make release             Full release: build all + package"
 	@echo ""
 	@echo "Version override:"

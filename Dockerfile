@@ -11,7 +11,7 @@ ARG CROSSTOOL_NG_VERSION=1.28.0
 
 # libretro-super commit (update periodically for new cores/fixes)
 # Check latest: git ls-remote https://github.com/libretro/libretro-super.git HEAD
-ARG LIBRETRO_SUPER_REF=b344383eb04aae786d8a9565fe2a61d940a574c0
+ARG LIBRETRO_SUPER_REF=d52d402682bf60f1cdb11148fd041c0145a8e9c0
 
 # Toolchain versions - matched for PlayStation Classic compatibility
 ARG CT_LINUX_VERSION=4_4
@@ -136,7 +136,8 @@ RUN dpkg --add-architecture armhf && \
     libasound2-dev:armhf \
     libudev-dev:armhf \
     libusb-1.0-0-dev:armhf \
-    libsdl2-dev:armhf \
+    libsdl2-dev \
+    libsdl2-2.0-0:armhf \
     libgles2-mesa-dev:armhf \
     libegl1-mesa-dev:armhf \
     libdrm-dev:armhf \
@@ -151,6 +152,13 @@ RUN dpkg --add-architecture armhf && \
     libgl1-mesa-dev:armhf \
     && (apt-get remove -y libpulse-dev:armhf || true) \
     && rm -rf /var/lib/apt/lists/*
+
+# Normalize SDL header locations for cores that hardcode <SDL2/SDL.h> or <SDL.h>.
+RUN set -eux; \
+    sdl_dir="$(find /usr/include -path '*/SDL2' -type d | head -n1)"; \
+    test -n "$sdl_dir"; \
+    mkdir -p /usr/include/arm-linux-gnueabihf/SDL2; \
+    cp -a "$sdl_dir"/. /usr/include/arm-linux-gnueabihf/SDL2/
 
 # ==============================================================================
 # Copy Custom Toolchain from Stage 1

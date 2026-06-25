@@ -257,12 +257,14 @@ SRC_DIR="$(core_source_dir)"
 if [ -d "$SRC_DIR/.git" ]; then
     COMMIT=$(cd "$SRC_DIR" && git rev-parse HEAD 2>/dev/null)
     URL=$(cd "$SRC_DIR" && git config --get remote.origin.url 2>/dev/null)
+    LIBRETRO_SUPER_COMMIT=$(cd /build/libretro-super && git rev-parse HEAD 2>/dev/null)
     if [ -n "$COMMIT" ]; then
         echo "=== Recording source commit: $COMMIT ==="
         {
             echo "core=$CORE_NAME"
             echo "commit=$COMMIT"
             echo "url=$URL"
+            echo "libretro_super_commit=$LIBRETRO_SUPER_COMMIT"
             echo "ref=${CORE_TAG_REF_USED:-branch}"
             echo "ref_source=$CORE_TAG_SOURCE"
             echo "build_date=$(date -u +%Y-%m-%dT%H:%M:%SZ)"

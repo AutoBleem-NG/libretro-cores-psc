@@ -6,6 +6,7 @@ Cross-compiled libretro emulator cores optimized for PlayStation Classic.
 
 - Docker
 - Make
+- Docker daemon access for the current user (`docker info` must succeed)
 
 ## Usage
 
@@ -26,6 +27,7 @@ Outputs:
 - `build_metadata/COMMITS.txt` - source commit manifest for built cores
 - `build_metadata/VERSION` - build/toolchain version info
 - `build_metadata/commits/*.so.commit` - per-core commit sidecars used to build the manifest
+- `releases/libretro-cores-psc-*.md` - generated release notes for GitHub releases
 - `build_status/{success,failed,skipped}.txt` - latest build run status
 - `dist/cores/*.so` - built libretro cores
 - `dist/info/*.info` - libretro core metadata copied from the pinned `libretro-super` checkout
@@ -55,8 +57,12 @@ Self-contained Docker build with crosstool-ng toolchain:
 ```bash
 make check-version                    # Compare pinned vs latest
 make LIBRETRO_SUPER_REF=<commit>      # Build specific version
-make release                          # Creates libretro-cores-psc-<date>-<commit>.tar.gz
+make release                          # Creates libretro-cores-psc-<date>-<commit>.tar.gz and .md release notes
 ```
+
+Changing `LIBRETRO_SUPER_REF` invalidates cached core outputs on the next full
+build. Existing `.so` files are only reused when their recorded
+`libretro-super` commit matches the current pin.
 
 ## License
 
